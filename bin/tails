@@ -1,0 +1,4 @@
+#!/usr/bin/env python
+
+import tails.tails
+tails.tails.main()
