@@ -1,5 +1,5 @@
-Tails
-=====
+Tails: A Sidekick for Sanic apps
+================================
 
 A collection of utilities for Sanic (and/or Stellata and/or Webpack)
 apps.

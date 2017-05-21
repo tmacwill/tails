@@ -19,7 +19,7 @@ setuptools.setup(
         'Programming Language :: Python :: 3 :: Only',
         'Topic :: Database',
     ],
-    description='Management scripts for Sanic apps',
+    description='Utilities for Sanic apps',
     install_requires=[
         'sanic',
         'stellata',

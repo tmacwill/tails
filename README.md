@@ -1,4 +1,4 @@
-# Tails
+# Tails: A Sidekick for Sanic apps
 
 A collection of utilities for Sanic (and/or Stellata and/or Webpack) apps.
 
@@ -22,6 +22,6 @@ Run a production server:
 
     tails foo server --production --host=0.0.0.0 --port=9000
 
-Reset the instance:
+Reset to a fresh database with no data.
 
     tails foo reset

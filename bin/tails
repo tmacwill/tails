@@ -1,4 +1,4 @@
 #!/usr/bin/env python
 
-import tails.tails
-tails.tails.main()
+import tails.cli
+tails.cli.main()

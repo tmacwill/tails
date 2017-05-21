@@ -1,9 +1,9 @@
 import argparse
 import atexit
 import importlib
-import logging
 import os
 import multiprocessing
+import sanic
 import subprocess
 import stellata
 import stellata.schema
@@ -61,11 +61,11 @@ class Migrate(_Command):
         return 'migrate'
 
     def parse(self, parser):
-        return
+        parser.add_argument('--dry-run', action='store_true', default=False, help='Do a try run, without executing any SQL')
 
     def run(self, args):
         module = importlib.import_module(args.app)
-        print(stellata.schema.migrate(module.db, execute=True))
+        print(stellata.schema.migrate(module.db, execute=not args.dry_run))
 
 class Reset(_Command):
     def command(self):
@@ -101,6 +101,9 @@ class Server(_Command):
         parser.add_argument('--watch', action='store_true', help='Watch the working directory for changes')
 
     def run(self, args):
+        if not args.production:
+            print('Running server on %s:%s' % (args.host, args.port))
+
         if args.build:
             build_process = _build(args.production, args.watch)
 
@@ -146,12 +149,19 @@ def _register_command(command, subparsers):
     command.parse(parser)
 
 def _run_server(args):
-    # suppress double sanic logging output
-    logging.getLogger('sanic').setLevel(logging.INFO)
+    log_config = sanic.config.LOGGING
+    log_config['loggers']['sanic']['level'] = 'DEBUG'
+    log_config['loggers']['sanic']['handlers'] = []
+    log_config['loggers']['network']['level'] = 'CRITICAL'
+    log_config['loggers']['network']['handlers'] = []
+    if args.production:
+        log_config['loggers']['sanic']['level'] = 'INFO'
+
     kwargs = {
         'host': args.host,
         'port': args.port,
         'debug': not args.production,
+        'log_config': log_config,
     }
 
     # dynamically import module passed as arg
