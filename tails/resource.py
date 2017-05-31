@@ -10,6 +10,18 @@ def forbidden():
 def json(data):
     return sanic.response.HTTPResponse(stellata.model.serialize(data), content_type='application/json')
 
+def html(body, head=''):
+    return sanic.response.html('''<!doctype html>
+<html>
+  <head>
+    %s
+  </head>
+  <body>
+    %s
+  </body>
+</html>
+''' % (head, body))
+
 def ok(data=None):
     if data is None:
         data = {}
