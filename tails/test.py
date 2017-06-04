@@ -11,8 +11,8 @@ class TestCase(unittest.TestCase):
 
         # set up sane console output
         warnings.simplefilter('ignore')
-        del sanic.config.LOGGING['handlers']['accessTimedRotatingFile']
-        del sanic.config.LOGGING['handlers']['errorTimedRotatingFile']
+        sanic.config.LOGGING['handlers'].pop('accessTimedRotatingFile', None)
+        sanic.config.LOGGING['handlers'].pop('errorTimedRotatingFile', None)
         sanic.config.LOGGING['loggers']['sanic']['level'] = 'DEBUG'
         sanic.config.LOGGING['loggers']['sanic']['handlers'] = []
         sanic.config.LOGGING['loggers']['network']['level'] = 'CRITICAL'

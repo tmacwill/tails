@@ -148,7 +148,11 @@ class Server(_Command):
             observer.start()
 
 def _build(production=False, watch=False):
-    args = ['./node_modules/webpack/bin/webpack.js', '--progress']
+    webpack = './node_modules/webpack/bin/webpack.js'
+    if not os.path.isfile(webpack):
+        return
+
+    args = [webpack, '--progress']
     env = os.environ.copy()
 
     if production:
