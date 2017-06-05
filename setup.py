@@ -17,7 +17,6 @@ setuptools.setup(
         'License :: OSI Approved :: MIT License',
         'Intended Audience :: Developers',
         'Programming Language :: Python :: 3 :: Only',
-        'Topic :: Database',
     ],
     description='Utilities for Sanic apps',
     install_requires=[

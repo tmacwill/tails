@@ -147,6 +147,19 @@ class Server(_Command):
             observer.schedule(handler, path='.', recursive=True)
             observer.start()
 
+class Test(_Command):
+    def block(self, args):
+        return False
+
+    def command(self):
+        return 'test'
+
+    def parse(self, parser):
+        return
+
+    def run(self, app, args, index=0):
+        os.system('TEST=1 python -m unittest')
+
 def _build(production=False, watch=False):
     webpack = './node_modules/webpack/bin/webpack.js'
     if not os.path.isfile(webpack):
@@ -214,6 +227,7 @@ def main():
     _register_command(Migrate(), subparsers)
     _register_command(Reset(), subparsers)
     _register_command(Server(), subparsers)
+    _register_command(Test(), subparsers)
 
     block = False
     args = parser.parse_args()
