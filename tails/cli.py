@@ -155,10 +155,13 @@ class Test(_Command):
         return 'test'
 
     def parse(self, parser):
-        return
+        parser.add_argument('-m', '--module', action='append', help='Test file to run')
 
     def run(self, app, args, index=0):
-        os.system('TEST=1 python -m unittest')
+        if not args.module:
+            args.module = []
+
+        os.system('TEST=1 python -m unittest %s' % ' '.join(args.module))
 
 def _build(production=False, watch=False):
     webpack = './node_modules/webpack/bin/webpack.js'
@@ -219,7 +222,7 @@ def main():
     sanic.config.LOGGING['loggers']['network']['handlers'] = []
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('apps', nargs=argparse.REMAINDER)
+    parser.add_argument('app', nargs='+')
 
     # create subparser, then register each command to it
     subparsers = parser.add_subparsers(dest='command')
@@ -237,7 +240,7 @@ def main():
             if command.block(args):
                 block = True
 
-            for i, app in enumerate(args.apps):
+            for i, app in enumerate(args.app):
                 os.chdir(path)
                 os.chdir(app + '/../')
                 sys.path.append(os.getcwd())
