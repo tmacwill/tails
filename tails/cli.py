@@ -164,9 +164,12 @@ class Test(_Command):
         os.system('TEST=1 python -m unittest %s' % ' '.join(args.module))
 
 def _build(production=False, watch=False):
+    if not os.path.isfile('./webpack.config.js'):
+        return
+
     webpack = './node_modules/webpack/bin/webpack.js'
     if not os.path.isfile(webpack):
-        return
+        webpack = 'webpack'
 
     args = [webpack, '--progress']
     env = os.environ.copy()
