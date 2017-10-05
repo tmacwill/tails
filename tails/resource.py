@@ -79,5 +79,8 @@ def ok(data=None):
 def redirect(url):
     return sanic.response.redirect(url)
 
+def text(t):
+    return sanic.response.text(t)
+
 def unauthorized():
     return sanic.response.text('', status=401)

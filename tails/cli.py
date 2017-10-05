@@ -155,13 +155,13 @@ class Test(_Command):
         return 'test'
 
     def parse(self, parser):
-        parser.add_argument('-m', '--module', action='append', help='Test file to run')
+        parser.add_argument('-t', '--tests', action='append', help='Tests to run')
 
     def run(self, app, args, index=0):
-        if not args.module:
-            args.module = []
+        if not args.tests:
+            args.tests = []
 
-        os.system('TEST=1 python -m unittest %s' % ' '.join(args.module))
+        os.system('TEST=1 python -m unittest %s' % ' '.join(args.tests))
 
 def _build(production=False, watch=False):
     if not os.path.isfile('./webpack.config.js'):
@@ -217,13 +217,6 @@ def _start_server_process(app, host, port, production):
     return process
 
 def main():
-    del sanic.config.LOGGING['handlers']['accessTimedRotatingFile']
-    del sanic.config.LOGGING['handlers']['errorTimedRotatingFile']
-    sanic.config.LOGGING['loggers']['sanic']['level'] = 'DEBUG'
-    sanic.config.LOGGING['loggers']['sanic']['handlers'] = []
-    sanic.config.LOGGING['loggers']['network']['level'] = 'CRITICAL'
-    sanic.config.LOGGING['loggers']['network']['handlers'] = []
-
     parser = argparse.ArgumentParser()
     parser.add_argument('app', nargs='+')
 
