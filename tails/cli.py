@@ -1,6 +1,7 @@
 import argparse
 import atexit
 import importlib
+import json
 import os
 import multiprocessing
 import sanic
@@ -48,12 +49,12 @@ class _Command:
     def parse(self, parser):
         raise NotImplementedError()
 
-    def run(self, app, args, index=0):
+    def run(self, app, args):
         raise NotImplementedError()
 
 class Build(_Command):
     def block(self, args):
-        return args.watch
+        return args['watch']
 
     def command(self):
         return 'build'
@@ -62,11 +63,11 @@ class Build(_Command):
         parser.add_argument('--production', action='store_true', default=False, help='Build files in production mode')
         parser.add_argument('--watch', action='store_true', default=False, help='Watch the working directory for changes')
 
-    def run(self, app, args, index=0):
-        process = _build(args.production, args.watch)
+    def run(self, app, args):
+        process = _build(args['production'], args['watch'])
 
         # if not in watch mode, then wait for process to complete
-        if not args.watch:
+        if not args['watch']:
             process.wait()
 
 class Migrate(_Command):
@@ -80,9 +81,9 @@ class Migrate(_Command):
         parser.add_argument('--dry-run', action='store_true', default=False, help='Do a try run, without executing any SQL')
         parser.add_argument('--debug', action='store_true', default=False, help='Print SQL statements as they are executed')
 
-    def run(self, app, args, index=0):
+    def run(self, app, args):
         module = importlib.import_module(app)
-        print(stellata.schema.migrate(module.db, execute=not args.dry_run, debug=args.debug))
+        print(stellata.schema.migrate(module.db, execute=not args['dry_run'], debug=args['debug']))
 
 class Reset(_Command):
     def block(self, args):
@@ -94,7 +95,7 @@ class Reset(_Command):
     def parse(self, parser):
         return
 
-    def run(self, app, args, index=0):
+    def run(self, app, args):
         module = importlib.import_module(app)
         stellata.schema.drop_tables_and_lose_all_data(module.db, execute=True)
         stellata.schema.migrate(module.db, execute=True)
@@ -113,35 +114,50 @@ class Server(_Command):
             default=False,
             help='Build files in addition to running server'
         )
-        parser.add_argument('--host', type=str, action='append', help='Host to run server on')
-        parser.add_argument('--port', type=int, action='append', help='Port to run server on')
+        parser.add_argument('--celery', type=str, action='append', default=[], help='Run celery worker')
+        parser.add_argument('--dependency', type=str, action='append', default=[], help='Run dependency')
+        parser.add_argument('--host', type=str, default='0.0.0.0', help='Host to run server on')
+        parser.add_argument('--port', type=int, default=9000, help='Port to run server on')
         parser.add_argument(
             '--production',
             action='store_true',
             default=False,
             help='Run the server in production mode'
         )
-        parser.add_argument('--watch', action='store_true', help='Watch the working directory for changes')
+        parser.add_argument(
+            '--watch',
+            action='store_true',
+            default=False,
+            help='Watch the working directory for changes'
+        )
 
-    def run(self, app, args, index=0):
-        host = '0.0.0.0'
-        if args.host and index < len(args.host):
-            host = args.host[index]
+    def run(self, app, args):
+        host = args['host']
+        port = args['port']
+        celery = args['celery']
+        dependencies = args['dependencies']
+        production = args['production']
+        watch = args['watch']
+        build = args['build']
 
-        port = 9000 + index
-        if args.port and index < len(args.port):
-            port = args.port[index]
-
-        production = args.production
         if not production:
             print('Running %s on %s:%s' % (app, host, port))
 
-        if args.build:
-            build_process = _build(production, args.watch)
+        # start webpack process
+        if build:
+            _build(production, watch)
+
+        # start celery processes
+        for name in celery:
+            _celery(name)
+
+        # start celery processes
+        for command in dependencies:
+            _dependency(command)
 
         # use watchdog to monitor changes to working directory and reload server on change
         server_process = _start_server_process(app, host, port, production)
-        if args.watch:
+        if watch:
             handler = ServerReloadHandler(server_process, app, host, port, production)
             observer = watchdog.observers.Observer()
             observer.schedule(handler, path='.', recursive=True)
@@ -155,13 +171,10 @@ class Test(_Command):
         return 'test'
 
     def parse(self, parser):
-        parser.add_argument('-t', '--tests', action='append', help='Tests to run')
+        parser.add_argument('-t', '--tests', action='append', default=[], help='Tests to run')
 
-    def run(self, app, args, index=0):
-        if not args.tests:
-            args.tests = []
-
-        os.system('TEST=1 python -m unittest %s' % ' '.join(args.tests))
+    def run(self, app, args):
+        os.system('TEST=1 python -m unittest %s' % ' '.join(args['tests']))
 
 def _build(production=False, watch=False):
     if not os.path.isfile('./webpack.config.js'):
@@ -182,6 +195,16 @@ def _build(production=False, watch=False):
         args += ['--watch']
 
     process = subprocess.Popen(args, env=env)
+    atexit.register(process.terminate)
+    return process
+
+def _celery(name):
+    process = subprocess.Popen(['celery', 'worker', '-A', name, '-l', 'info'])
+    atexit.register(process.terminate)
+    return process
+
+def _dependency(command):
+    process = subprocess.Popen(command.split(' '))
     atexit.register(process.terminate)
     return process
 
@@ -218,7 +241,8 @@ def _start_server_process(app, host, port, production):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('app', nargs='+')
+    parser.add_argument('app')
+    parser.add_argument('--config', type=str, default=None, help='Path to config')
 
     # create subparser, then register each command to it
     subparsers = parser.add_subparsers(dest='command')
@@ -228,19 +252,22 @@ def main():
     _register_command(Server(), subparsers)
     _register_command(Test(), subparsers)
 
+    args = vars(parser.parse_args())
+    if args['config'] and os.path.isfile(args['config']):
+        with open(args['config'], 'r') as f:
+            args.update(json.loads(f.read()))
+
     block = False
-    args = parser.parse_args()
     path = os.getcwd()
     for command in _commands:
-        if command.command() == args.command:
+        if command.command() == args['command']:
             if command.block(args):
                 block = True
 
-            for i, app in enumerate(args.app):
-                os.chdir(path)
-                os.chdir(app + '/../')
-                sys.path.append(os.getcwd())
-                command.run(app.split('/')[-1], args, i)
+            os.chdir(path)
+            os.chdir(args['app'] + '/../')
+            sys.path.append(os.getcwd())
+            command.run(args['app'].split('/')[-1], args)
 
     # if any command is blocking, then wait for the user to exit
     if block:
